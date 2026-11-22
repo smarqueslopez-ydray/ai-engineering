@@ -15,7 +15,7 @@ Usa arquitectura **CAG (Cache Augmented Generation)**: unos pocos ejemplos de es
 | 3 | Contexto estático: ejemplos de estimaciones previas | ✅ |
 | 4 | Servicio de llamada al LLM | ✅ |
 | 5 | Endpoint `POST /api/v1/estimate` | ✅ |
-| 6 | Aplicación FastAPI (`/health`, Swagger) | ⏳ |
+| 6 | Aplicación FastAPI (`/health`, Swagger) | ✅ |
 | 7 | Verificación | ⏳ |
 
 ## Puesta en marcha
@@ -98,9 +98,20 @@ Cada capa tiene una sola responsabilidad:
 | `schemas/` | Contratos de datos de la API: qué se recibe y qué se devuelve. Validan la entrada y documentan Swagger |
 | `services/` | Construir el prompt con el contexto, llamar al proveedor y procesar la respuesta |
 | `context/` | Datos de referencia que se inyectan en el prompt |
+| `main.py` | Crea la app FastAPI, registra los routers con el prefijo `/api/v1` y define `/health`. Solo "pegamento": sin lógica |
 | `config.py` | Configuración tipada y validada desde el entorno |
 
 ## API
+
+Con el servidor arrancado, la documentación interactiva (Swagger) está en **http://localhost:8000/docs**.
+
+### `GET /health`
+
+Comprueba que el servicio está en marcha. **No llama al LLM**, así que no tiene coste. Pensado para Docker, balanceadores o monitores.
+
+```json
+{ "status": "healthy" }
+```
 
 ### `POST /api/v1/estimate`
 
@@ -192,6 +203,8 @@ Al añadir o cambiar un ejemplo:
 - **uv y Python 3.11**: uv gestiona el entorno virtual y el lockfile (`uv.lock`), de modo que las versiones son reproducibles. Se fija Python 3.11 aunque haya versiones más nuevas, por compatibilidad de las dependencias.
 
 ### API
+- **Prefijo `/api/v1` en `main.py`** (como pide el enunciado), no en el router: permite publicar una `/api/v2` en el futuro sin romper a los clientes de la v1.
+- **`main.py` mínimo**: solo crea la app, registra routers y define `/health`. El cliente de OpenAI vive en `services/`, no aquí.
 - **Schemas en su propia capa (`schemas/`)**, como en la lectura 3: el contrato de la API queda documentado en código, separado del transporte. El enunciado no exige la carpeta, pero la arquitectura por capas lo pide.
 - **`min_length=50` en `transcription`**: una transcripción vacía o mínima se rechaza (422) antes de gastar una llamada al LLM.
 - **`usage` en la respuesta**: el enunciado permite añadir campos; los tokens sirven para medir el coste de cada estimación.
