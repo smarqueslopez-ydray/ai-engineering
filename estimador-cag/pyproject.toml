@@ -15,3 +15,12 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "uvicorn[standard]>=0.54.0",
 ]
+
+# Lint y formato con ruff (uvx ruff check app · uvx ruff format app)
+[tool.ruff.lint]
+# Reglas por defecto + docstrings (D)
+extend-select = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+# Docstrings en Google style (Args:, Returns:, Raises:, Attributes:)
+convention = "google"
