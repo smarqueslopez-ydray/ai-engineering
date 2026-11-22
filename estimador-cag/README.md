@@ -16,7 +16,7 @@ Usa arquitectura **CAG (Cache Augmented Generation)**: unos pocos ejemplos de es
 | 4 | Servicio de llamada al LLM | ✅ |
 | 5 | Endpoint `POST /api/v1/estimate` | ✅ |
 | 6 | Aplicación FastAPI (`/health`, Swagger) | ✅ |
-| 7 | Verificación | ⏳ |
+| 7 | Verificación | ✅ |
 
 ## Puesta en marcha
 
@@ -65,6 +65,32 @@ openai gpt-4o-mini development DEBUG True
 ```
 
 Si sale un `ValidationError`, consulta [Problemas frecuentes](#problemas-frecuentes).
+
+### Arrancar y probar
+
+Desde la carpeta `estimador-cag/`, **no desde la raíz del repositorio**:
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+Cuando aparezca `Application startup complete.`, el servicio está en `http://127.0.0.1:8000`:
+
+| URL | Qué hace |
+|---|---|
+| http://127.0.0.1:8000/health | Comprueba que responde: `{"status": "healthy"}` |
+| http://127.0.0.1:8000/docs | Swagger: probar `POST /api/v1/estimate` con **Try it out** |
+| http://127.0.0.1:8000/redoc | Documentación en formato ReDoc |
+
+Prueba con `curl` (bash o Git Bash), con la transcripción del enunciado:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/estimate \
+  -H "Content-Type: application/json" \
+  -d '{"transcription": "En la reunión con el equipo de marketing, el cliente explicó que necesita una landing page con formulario de contacto, integración con su CRM actual (HubSpot), y una sección de blog con editor WYSIWYG. El plazo ideal sería tenerlo listo en 4 semanas. El diseño ya existe en Figma."}'
+```
+
+> En **PowerShell** este `curl` no funciona tal cual (las `\` y las comillas son de bash). En Windows lo más cómodo es Swagger (`/docs`) o Git Bash.
 
 ## Arquitectura
 
@@ -131,10 +157,7 @@ Recibe la transcripción de una reunión y devuelve la estimación.
 
 ```json
 {
-  "estimation": "## Estimación: ...
-
-### Desglose de tareas
-...",
+  "estimation": "## Estimación: ...\n\n### Desglose de tareas\n...",
   "model": "gpt-4o-mini-2024-07-18",
   "provider": "openai",
   "usage": { "input_tokens": 2414, "output_tokens": 323 }
@@ -241,6 +264,8 @@ Al añadir o cambiar un ejemplo:
 |---|---|---|
 | `ValidationError: ... Extra inputs are not permitted` al arrancar | El `.env` tiene una variable que no está declarada en `Settings` (`app/config.py`) | Declárala en `Settings` o bórrala del `.env` |
 | La app no lee el `.env` (se usan los valores por defecto) | La ruta del `.env` es relativa a la carpeta desde la que se arranca | Ejecuta los comandos desde `estimador-cag/` |
+| `ModuleNotFoundError: No module named 'app'` al arrancar uvicorn | Se ha arrancado desde la raíz del repositorio (`ai-engineering/`) | Entra en `estimador-cag/` y vuelve a arrancar |
+| `404 Not Found` en `http://127.0.0.1:8000/` | La API no tiene endpoint en `/` | Usa `/docs`, `/health` o `/api/v1/estimate` |
 | Los cambios en el `.env` no se aplican | La configuración está cacheada con `@lru_cache` | Reinicia el servidor; `--reload` no basta |
 | `openai.AuthenticationError` (401) | API key inválida, revocada o caducada | Revisa `OPENAI_API_KEY` en el `.env` o crea una key nueva |
 | `openai.RateLimitError` (429) | Límite de peticiones superado o sin crédito | Espera y reintenta, o revisa el saldo de la cuenta |
@@ -251,6 +276,7 @@ Al añadir o cambiar un ejemplo:
 - **La llamada al LLM es síncrona dentro de una función `async`**, como en el ejemplo del curso: bloquea el servidor mientras espera al modelo. La mejora es usar `AsyncOpenAI` y `await`.
 - **Un solo proveedor (OpenAI).** Elegir proveedor con `LLM_PROVIDER` llegará en la Sesión 3.
 - **Los errores de la API no se gestionan todavía**: se propagan a quien llama.
+- **El modelo puede fallar en las cuentas y no es determinista.** En la verificación, la misma transcripción dio 170 h en una llamada y, en otra, unas filas que sumaban 200 h con un total declarado de 250 h. Los costes por fila eran correctos, pero el total de horas y el porcentaje de gestión no. La mejora prevista es un **postprocesamiento** que recalcule los totales en el código, en vez de fiarse del modelo.
 - **Todo el contexto viaja en cada llamada (CAG).** Con más de unos 10 ejemplos, el rendimiento baja (más coste y menos atención del modelo) y lo adecuado sería pasar a **RAG**, que recupera solo los ejemplos más relevantes para cada transcripción.
 
 ## Convenciones
