@@ -14,7 +14,7 @@ Usa arquitectura **CAG (Cache Augmented Generation)**: unos pocos ejemplos de es
 | 2 | Configuración con variables de entorno (`config.py`, `.env.example`) | ✅ |
 | 3 | Contexto estático: ejemplos de estimaciones previas | ✅ |
 | 4 | Servicio de llamada al LLM | ✅ |
-| 5 | Endpoint `POST /api/v1/estimate` | ⏳ |
+| 5 | Endpoint `POST /api/v1/estimate` | ✅ |
 | 6 | Aplicación FastAPI (`/health`, Swagger) | ⏳ |
 | 7 | Verificación | ⏳ |
 
@@ -75,6 +75,8 @@ estimador-cag/
 │   ├── config.py            # Configuración desde variables de entorno
 │   ├── routers/
 │   │   └── estimations.py   # Endpoints HTTP (capa de transporte)
+│   ├── schemas/
+│   │   └── estimation.py    # Contratos de request y response (Pydantic)
 │   ├── services/
 │   │   └── llm_service.py   # Lógica de negocio: prompt + llamada al LLM
 │   └── context/
@@ -93,9 +95,47 @@ Cada capa tiene una sola responsabilidad:
 | Capa | Responsabilidad |
 |---|---|
 | `routers/` | Recibir la petición HTTP, validarla, delegar en el servicio y devolver la respuesta. No construye prompts ni llama al LLM |
+| `schemas/` | Contratos de datos de la API: qué se recibe y qué se devuelve. Validan la entrada y documentan Swagger |
 | `services/` | Construir el prompt con el contexto, llamar al proveedor y procesar la respuesta |
 | `context/` | Datos de referencia que se inyectan en el prompt |
 | `config.py` | Configuración tipada y validada desde el entorno |
+
+## API
+
+### `POST /api/v1/estimate`
+
+Recibe la transcripción de una reunión y devuelve la estimación.
+
+**Request**
+
+```json
+{
+  "transcription": "En la reunión con el cliente se discutió la necesidad de..."
+}
+```
+
+`transcription` es obligatoria y tiene un **mínimo de 50 caracteres**. Si falta o es más corta, la API responde **422** sin llamar al LLM.
+
+**Response (200)**
+
+```json
+{
+  "estimation": "## Estimación: ...
+
+### Desglose de tareas
+...",
+  "model": "gpt-4o-mini-2024-07-18",
+  "provider": "openai",
+  "usage": { "input_tokens": 2414, "output_tokens": 323 }
+}
+```
+
+| Campo | Descripción |
+|---|---|
+| `estimation` | Estimación en Markdown: tabla de tareas, total, equipo, duración y supuestos |
+| `model` | Modelo exacto que la generó (*snapshot*) |
+| `provider` | Proveedor de LLM |
+| `usage` | Tokens de entrada y de salida de la llamada |
 
 ## Contexto CAG: ejemplos de referencia
 
@@ -150,6 +190,11 @@ Al añadir o cambiar un ejemplo:
 - **Arquitectura por capas** (`routers` → `services` → `context`): separa transporte, lógica y datos. Los routers son finos y la lógica vive en los servicios, así que se puede cambiar de proveedor o de prompt sin tocar los endpoints.
 - **`context/` como punto de sustitución**: hoy son datos estáticos en código. Al pasar a RAG se sustituirá por un servicio de búsqueda semántica sin reescribir el resto.
 - **uv y Python 3.11**: uv gestiona el entorno virtual y el lockfile (`uv.lock`), de modo que las versiones son reproducibles. Se fija Python 3.11 aunque haya versiones más nuevas, por compatibilidad de las dependencias.
+
+### API
+- **Schemas en su propia capa (`schemas/`)**, como en la lectura 3: el contrato de la API queda documentado en código, separado del transporte. El enunciado no exige la carpeta, pero la arquitectura por capas lo pide.
+- **`min_length=50` en `transcription`**: una transcripción vacía o mínima se rechaza (422) antes de gastar una llamada al LLM.
+- **`usage` en la respuesta**: el enunciado permite añadir campos; los tokens sirven para medir el coste de cada estimación.
 
 ### Configuración
 - **Validación al arrancar (*fail fast*)**: Pydantic Settings comprueba tipos y variables al iniciar la aplicación, no en la primera petición.
