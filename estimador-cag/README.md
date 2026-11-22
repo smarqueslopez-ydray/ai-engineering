@@ -198,7 +198,17 @@ Medido con una llamada real (22/11/2026, `gpt-4o-mini`) con la transcripción de
 | Salida (estimación) | 323 | 0,000194 $ |
 | **Total por estimación** | **2.737** | **≈ 0,00056 $** |
 
-Casi toda la entrada es el contexto CAG, que se reenvía en cada llamada: con 1.000 estimaciones al día serían unos 2,4 millones de tokens de entrada diarios solo en contexto. Latencia observada: unos 5 s.
+Desglose de la entrada, contado con el tokenizador de `gpt-4o-mini` (`tiktoken`, `o200k_base`). La suma coincide con el `usage` de la API:
+
+| Bloque de la entrada | Tokens | % | Coste |
+|---|---|---|---|
+| Estimaciones de referencia (5 ejemplos) | 1.901 | 79 % | 0,000285 $ |
+| Instrucciones, reglas y formato | 439 | 18 % | 0,000066 $ |
+| Transcripción | 63 | 3 % | 0,000009 $ |
+| Formato de los mensajes (lo añade la API) | 11 | < 1 % | 0,000002 $ |
+| **Total de entrada** | **2.414** | 100 % | **0,000362 $** |
+
+El 79 % de la entrada son los ejemplos, el contexto CAG que se reenvía en cada llamada. Con 1.000 estimaciones al día serían unos 1,9 millones de tokens de entrada diarios solo en ejemplos. Latencia observada: unos 5 s.
 
 ### Cómo añadir o modificar un ejemplo
 
